@@ -29,7 +29,7 @@ def save_photos_to_yadisk(photo_info_list, yadisk_token, yadisk_folder):
         photo_url = max(photo_info['sizes'], key=lambda x: x['width'] * x['height'])['url']
         photo_likes = photo_info['likes']['count']
         photo_date = datetime.fromtimestamp(photo_info['date']).strftime('%Y-%m-%d_%H-%M-%S')
-        photo_name = f'{photo_likes}.jpg'
+        photo_name = f'{photo_likes}-{photo_date}.jpg'
 
         headers = {
             'Authorization': f'OAuth {yadisk_token}'
@@ -48,23 +48,44 @@ def save_photos_to_yadisk(photo_info_list, yadisk_token, yadisk_folder):
             "size": "z"
         })
 
-def main():
-    with open('config.json') as f:
-        config = json.load(f)
 
-    vk_token = config.get('vk_token')
-    vk_user_id = config.get('vk_user_id', '4957073')
-    yadisk_token = config.get('yadisk_token')
-    yadisk_folder = config.get('yadisk_folder', 'Photos saved')
+    with open('photos_info.json', 'w', encoding='utf-8') as json_file:
+        json.dump(files_info, json_file, ensure_ascii=False, indent=4)
+
+
+def main():
+    vk_token = input('Введите токен ВКонтакте: ')
+    target_profile = input('Введите ID или screen name целевого профиля ВКонтакте: ')
+    try:
+        quantity = int(input('Введите количество загружаемых фотографий: '))
+    except ValueError:
+        print('Ошибка: Введите число')
+        return
+
+
+    with open('config.json') as config_file:
+        config = json.load(config_file)
+    yadisk_token = config['yadisk_token']
+    yadisk_folder = config['yadisk_folder']
+
+
+    vk_user_id = target_profile
+    if not target_profile.isdigit():
+
+        params = {
+            'screen_name': target_profile,
+            'access_token': vk_token,
+            'v': '5.199'
+        }
+        response = requests.get('https://api.vk.com/method/utils.resolveScreenName', params=params)
+        response.raise_for_status()
+        vk_user_id = response.json()['response']['object_id']
 
     vk_client = VKAPIClient(vk_token)
-    photos_info = vk_client.get_profile_photos_info(vk_user_id)
+    photos_info = vk_client.get_profile_photos_info(vk_user_id, quantity)
 
     save_photos_to_yadisk(photos_info, yadisk_token, yadisk_folder)
 
-
-    with open('photos_info.json', 'w') as json_file:
-        json.dump(photos_info, json_file, ensure_ascii=False, indent=4)
 
 if __name__ == "__main__":
     main()
